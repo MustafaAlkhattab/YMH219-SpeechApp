@@ -13,6 +13,11 @@ internal sealed class SpeechWindow : Form
     private CancellationTokenSource? cancellation;
     private bool closePending;
     private readonly System.Windows.Forms.Timer meterTimer = new() { Interval = 100 };
+    private readonly System.Windows.Forms.Timer playbackTimer = new() { Interval = 125 };
+    private readonly ProgressBar playbackMeter = new() { Dock = DockStyle.Fill, Height = 10, Maximum = 1000, Margin = new(0, 2, 0, 7) };
+    private readonly Label playbackTime = Ui.Label("00:00 / 00:00", 10, false, Ui.Muted);
+    private double playbackSeconds;
+    private int playbackBytesPerSecond;
     private readonly Label status = Ui.Label("Hazırlanıyor…", 10, true, Ui.Muted);
     private readonly Label modelState = Ui.Label("Dil modelleri", 10, false, Ui.Muted);
     private readonly ProgressBar installProgress = new() { Dock = DockStyle.Fill, Height = 10, Margin = new(0, 3, 0, 7), Visible = false };
@@ -58,7 +63,7 @@ internal sealed class SpeechWindow : Form
             (Ui.Label("Metni seslendir", 19, true), 0),
             (Ui.Label("Metninizin diline uygun sesi seçin.", 10, false, Ui.Muted), 0),
             (Ui.Bar(Caption("Ses"), voices, Caption("Hız"), rate, sample), 0),
-            (input, 100),
+            (input, 100), (playbackTime, 0), (playbackMeter, 0),
             (Ui.Bar(play, pause, stop, clear), 0)));
         speechToText.Controls.Add(Ui.Stack(18,
             (Ui.Label("Konuşmayı yazıya dök", 19, true), 0),
@@ -118,6 +123,7 @@ internal sealed class SpeechWindow : Form
         languages.SelectedIndexChanged += (_, _) => RefreshControls();
         devices.SelectedIndexChanged += (_, _) => RefreshControls();
         meterTimer.Tick += (_, _) => UpdateMeter();
+        playbackTimer.Tick += (_, _) => UpdatePlaybackProgress();
         RefreshControls();
     }
 
@@ -214,6 +220,7 @@ internal sealed class SpeechWindow : Form
         if (reading.Length == 0) { status.Text = "Önce okunacak metni yazın."; input.Focus(); return; }
         var voice = SelectedVoice;
         var speed = (float)rate.Value;
+        ShowPlaybackProgress(0, 0);
         using var token = new CancellationTokenSource();
         cancellation = token;
         SetMode(Mode.Synthesizing, voice.Name + " · Ses hazırlanıyor…");
@@ -226,6 +233,9 @@ internal sealed class SpeechWindow : Form
             var provider = new BufferedWaveProvider(WaveFormat.CreateIeeeFloatWaveFormat(audio.Rate, 1))
                 { BufferLength = bytes.Length, ReadFully = false };
             provider.AddSamples(bytes, 0, bytes.Length);
+            playbackBytesPerSecond = provider.WaveFormat.AverageBytesPerSecond;
+            playbackSeconds = bytes.Length / (double)playbackBytesPerSecond;
+            ShowPlaybackProgress(0, playbackSeconds);
             var output = new WaveOutEvent();
             player = output;
             output.PlaybackStopped += (_, e) =>
@@ -234,6 +244,7 @@ internal sealed class SpeechWindow : Form
             };
             output.Init(provider);
             output.Play();
+            playbackTimer.Start();
             SetMode(Mode.Playing, voice.Name + " · Okunuyor");
         }
         catch (OperationCanceledException) { End("Okuma durduruldu."); }
@@ -244,8 +255,10 @@ internal sealed class SpeechWindow : Form
     private void PlaybackFinished(WaveOutEvent output, Exception? error)
     {
         if (!ReferenceEquals(output, player)) return;
+        playbackTimer.Stop();
         output.Dispose();
         player = null;
+        if (error is null) ShowPlaybackProgress(playbackSeconds, playbackSeconds);
         End(error is null ? "Okuma tamamlandı." : "Ses çıkışı hatası: " + error.Message);
     }
 
@@ -260,12 +273,31 @@ internal sealed class SpeechWindow : Form
         if (mode == Mode.Synthesizing) cancellation?.Cancel();
         else if (player is not null)
         {
+            playbackTimer.Stop();
             var current = player;
             player = null;
             current.Stop();
             current.Dispose();
             End("Okuma durduruldu.");
         }
+    }
+
+    private void UpdatePlaybackProgress()
+    {
+        if (mode != Mode.Playing || player is null || playbackBytesPerSecond <= 0) return;
+        try
+        {
+            double position = Math.Clamp(player.GetPosition() / (double)playbackBytesPerSecond, 0, playbackSeconds);
+            ShowPlaybackProgress(position, playbackSeconds);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or NAudio.MmException) { playbackTimer.Stop(); }
+    }
+
+    private void ShowPlaybackProgress(double current, double duration)
+    {
+        playbackMeter.Value = duration > 0 ? (int)(playbackMeter.Maximum * Math.Clamp(current / duration, 0, 1)) : 0;
+        const string format = @"mm\:ss";
+        playbackTime.Text = TimeSpan.FromSeconds(current).ToString(format) + " / " + TimeSpan.FromSeconds(duration).ToString(format);
     }
 
     private async Task Record()
@@ -356,6 +388,7 @@ internal sealed class SpeechWindow : Form
         player?.Dispose();
         player = null;
         meterTimer.Dispose();
+        playbackTimer.Dispose();
         speech.Dispose();
         base.OnFormClosed(e);
     }

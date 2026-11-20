@@ -14,6 +14,15 @@ internal static class Ui
     public static void Window(Form form, string title, int width, int height, int minWidth, int minHeight)
     {
         form.Text = title;
+        using (var resource = typeof(Ui).Assembly.GetManifestResourceStream("WindowIcon.ico"))
+        {
+            if (resource is not null)
+            {
+                var icon = new Icon(resource);
+                form.Icon = icon;
+                form.Disposed += (_, _) => icon.Dispose();
+            }
+        }
         form.Font = new("Segoe UI", 10f);
         form.AutoScaleMode = AutoScaleMode.Dpi;
         form.ClientSize = new(width, height);
