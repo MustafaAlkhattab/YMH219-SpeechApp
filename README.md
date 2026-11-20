@@ -1,48 +1,48 @@
-# Fırat Speech — YMH219
+# Fırat Speech
 
-Windows Forms üzerinde iki yönlü ses/metin uygulaması: metni seslendirme ve mikrofondan konuşmayı metne dönüştürme.
+Windows Forms üzerinde Türkçe ve İngilizce metin okuma ve konuşma dökümü. Model dosyaları kurulduktan sonra iki işlem de bilgisayarda çevrimdışı çalışır.
 
-**Öğrenci:** Mustafa Alkhatta — **250541607**
-
-## Teknolojiler
-C#, .NET 10, Windows Forms, NuGet `System.Speech` **10.0.0**, Windows SAPI.
+**Öğrenci** · Mustafa Alkhatta, 250541607
 
 ## Kurulum ve çalıştırma
-Windows 10/11 ve .NET 10 SDK gereklidir. Visual Studio'da .NET masaüstü iş yüküyle `SpeechApp.csproj` açılabilir.
+
+Windows 10/11 x64 ve .NET 10 SDK gereklidir. Visual Studio .NET masaüstü iş yüküyle `SpeechApp.csproj` açıp çalıştırabilirsiniz.
 
 ```powershell
 git clone https://github.com/MustafaAlkhattab/YMH219-SpeechApp.git
 cd YMH219-SpeechApp
-dotnet restore
-dotnet build -c Release
 dotnet run -c Release
 ```
 
-Windows'ta en az bir masaüstü TTS sesi bulunmalıdır. Mikrofon girişi için System.Speech ile uyumlu bir **masaüstü konuşma tanıma motoru**, mikrofon ve Windows mikrofon erişimi gerekir. Uygulama kurulu motorları listeler. Örneğin en-US motoru seçiliyse İngilizce konuşulmalıdır; Türkçe motor kurulu olmadan Türkçe dikte vaat edilmez. Eksik altyapı veya erişim hatası arayüzde açıklanır.
+İlk açılışta **Modelleri indir** düğmesine basın. İndirme yaklaşık 480 MB'dir. Kurulum için en az 650 MB boş alan ayırın. **Model klasörü** ile başka bir diski seçebilirsiniz. Arayüz indirme ve hata durumlarını gösterir. Kurulum, indirilen dosyaların SHA-256 özetlerini doğrular. Windows masaüstü konuşma dil paketi ve API anahtarı gerekmez.
 
-## Temel özellikler ve kullanım
-- Üst alana metin yazın, ses ve hız (-10…10) seçin, **Sesli oku** düğmesine basın.
-- **Duraklat / Devam** ve **Okumayı durdur** ile oynatmayı yönetin; **Metni temizle** alanı siler.
-- Alt araç çubuğunda tanıma dilini seçip **Mikrofon başlat** kullanın. Konuşma, saat ve güven değeriyle alt alana eklenir.
-- **Mikrofon durdur**, **Dökümü temizle** ve **TXT kaydet** bulunur.
-- Okuma ve mikrofon aynı anda çalıştırılmaz; kendi çıktısının yanlışlıkla dikteye alınması önlenir.
-- Durum etiketi aktif işlemi ve hataları gösterir. İşlemler asenkrondur; kaynaklar pencere kapanışında serbest bırakılır.
+## Metinden sese
 
-## Nesne tabanlı tasarım
-`SpeechService` sentezleyiciyi, tanıyıcıyı ve yaşam döngülerini kapsüller; olaylarla arayüze haber verir. `Form1` kontrolleri ve kullanıcı hatalarını yönetir. Arka plan sonuçları BeginInvoke ile arayüze aktarılır.
+İlk sekmede metin yazın ve içeriğin diline uygun sesi seçin. Hem Türkçe hem İngilizce için iki farklı sinir ağı sesi vardır. **Örnek metin** seçili dilde bir deneme cümlesi doldurur. **Sesli oku**, **Duraklat / Devam**, **Durdur** ve **Temizle** işlemleri bulunur. Okuma hızını değiştirebilirsiniz.
+
+## Sesten metne
+
+1. **Sesten metne** sekmesinde konuşacağınız dili ve mikrofonu seçin.
+2. **Mikrofonu başlat** düğmesine basın. Ses göstergesini izleyerek 1–2 cümle konuşun ve **Bitir ve yazıya dök** düğmesine basın. Bir kayıt 28 saniyeyle sınırlıdır ve sınıra ulaşınca otomatik çözümlenir.
+3. Metin saat ve dil ile gösterilir ve düzenlenebilir. **TXT kaydet** dosya oluşturur.
+4. Mikrofon yerine bir **WAV aç** seçeneği veya **Örneği çöz** ile seçili dilde cihazda üretilen kısa bir sentetik örnek kullanılabilir.
+
+## Teknoloji ve tasarım
+
+C# / .NET 10, Windows Forms, sherpa-onnx 2.0.1 (Windows x64 çalışma zamanı) ve NAudio 2.2.1. `MicrophoneTake` mikrofonu açıp tek bir konuşma parçasını belleğe alır. `NeuralSpeech` Supertonic 3 ile sesi üretir. Silero ile kayıtta konuşma olup olmadığını kontrol eder ve çok dilli Whisper Small int8 ile cümlenin tamamını çözer. Hesaplama arayüz iş parçacığından ayrı yürütülür.
 
 ## Ekran görüntüleri
-![Ses ve motor seçimi](docs/01-ready.png)
-![TTS tamamlandı durumu](docs/02-playback.png)
 
-## Kontrol ve bilinen sınırlamalar
-- Release derlemesi 0 hata / 0 uyarı ile geçti.
-- Microsoft David Desktop sesi ve en-US masaüstü motoru bulundu; örnek metnin TTS işlemi başlatıldı ve tamamlanma olayı doğrulandı.
-- Canlı mikrofon diktesi, duraklatma/devam ve TXT dışa aktarma kullanıcıyla birlikte ayrıca denenmelidir; doğrulanmış sayılmamıştır.
-- Doğruluk mikrofon, gürültü ve dil motoruna bağlıdır. Güven değeri doğruluk garantisi değildir.
-- Farklı bilgisayarda çalışma henüz denenmedi. Uygulama ses kaydını dosyaya almaz veya bulut servisine göndermez.
+![Türkçe sinir ağıyla metin okuma](docs/01-ready.png)
+![Türkçe ve İngilizce örneklerin dökümü](docs/02-playback.png)
 
-## Sözlü hazırlık ve kaynak
-DictationGrammar serbest konuşma içindir; SpeechRecognized tanınan sonucu getirir. RecognizeAsync arayüzü bekletmez. IDisposable kaynakların kapatılması mikrofonun açık kalmasını önler.
+## Doğrulama ve sınırlamalar
 
-[Microsoft SpeechRecognitionEngine belgesi](https://learn.microsoft.com/en-us/dotnet/api/system.speech.recognition.speechrecognitionengine)
+Windows Release derlemesi, dört ses seçeneğinin ses üretmesi, iki dilde yerel örnek çözümlemesi ve kaydedilmiş bir İngilizce konuşma dosyası sınandı. Mikrofon açma ve durdurma işlemleri gerçek bir Windows aygıtında doğrulandı. Sessizlikte döküm üretilmedi.
+
+Doğruluk telaffuza, çevre gürültüsüne ve seçilen dile bağlıdır. Dil her kayıt için seçilir. Uygulama iki dilli karışık bir kaydı otomatik bölmez ve durdurduktan sonra metni üretir. Mikrofon erişilemiyorsa durumu bildirir ve WAV çözümleme kullanılabilir. Ses kaydı bellekte kalır. Yalnız model kurulumunda ağ kullanılır.
+
+## Model kaynakları
+
+- [Sherpa-ONNX](https://github.com/k2-fsa/sherpa-onnx) · [Whisper Small ONNX](https://huggingface.co/csukuangfj/sherpa-onnx-whisper-small) · [Silero VAD](https://github.com/snakers4/silero-vad)
+- [Supertone Supertonic 3](https://huggingface.co/Supertone/supertonic-3) · [Sherpa-ONNX Supertonic int8 paketi](https://k2-fsa.github.io/sherpa/onnx/tts/supertonic.html). Model paketindeki OpenRAIL-M lisansı geçerlidir.
