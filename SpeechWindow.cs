@@ -73,6 +73,7 @@ internal sealed class SpeechWindow : Form
         modelState.Margin = new(0, 11, 10, 0);
         Controls.Add(Ui.Stack(18, (Ui.Label("Fırat Speech", 28, true), 0),
             (Ui.Bar(install, cancel, location, modelState), 0), (installProgress, 0), (tabs, 100), (status, 0)));
+        SizeChanged += (_, _) => status.MaximumSize = new(Math.Max(1, ClientSize.Width - 36), 0);
 
         Shown += (_, _) =>
         {
@@ -155,8 +156,8 @@ internal sealed class SpeechWindow : Form
         install.Enabled = idle && !SpeechModels.Ready;
         location.Enabled = idle;
         cancel.Visible = installProgress.Visible = mode == Mode.Installing;
-        modelState.Text = SpeechModels.Ready ? "Yerel modeller hazır" : "İlk kurulum · yaklaşık 550 MB";
-        play.Enabled = idle && SpeechModels.VoiceReady(SelectedVoice);
+        modelState.Text = SpeechModels.Ready ? "Yerel modeller hazır" : "İlk kurulum · yaklaşık 480 MB";
+        play.Enabled = idle && SpeechModels.SynthesisReady;
         pause.Enabled = speaking;
         pause.Text = mode == Mode.Paused ? "Devam et" : "Duraklat";
         stop.Enabled = speaking || mode == Mode.Synthesizing;
@@ -165,8 +166,10 @@ internal sealed class SpeechWindow : Form
         record.Enabled = idle && hasRecognition && devices.SelectedIndex >= 0;
         finish.Enabled = mode == Mode.Recording;
         openWave.Enabled = idle && hasRecognition;
-        demoWave.Enabled = idle && hasRecognition && SpeechModels.VoiceReady(DemoVoice);
-        if (devices.Items.Count == 0 && idle) micStatus.Text = "Mikrofon algılanamadı. WAV dosyası kullanılabilir.";
+        demoWave.Enabled = idle && hasRecognition && SpeechModels.SynthesisReady;
+        if (idle) micStatus.Text = devices.Items.Count == 0
+            ? "Mikrofon algılanamadı. WAV dosyası kullanılabilir."
+            : "Mikrofon kapalı";
     }
 
     private async Task Install()
@@ -310,7 +313,11 @@ internal sealed class SpeechWindow : Form
             string text = await Task.Run(() => speech.Transcribe(source(), language));
             if (text.Length == 0) { End("Konuşma algılanmadı. Mikrofona yakın ve net konuşmayı deneyin."); return; }
             string origin = example ? " · örnek" : "";
+            int entryStart = transcript.TextLength;
             transcript.AppendText($"[{DateTime.Now:HH:mm:ss} · {language.ToUpperInvariant()}{origin}] {text}{Environment.NewLine}");
+            transcript.SelectionStart = entryStart;
+            transcript.SelectionLength = 0;
+            transcript.ScrollToCaret();
             End(example ? "Sentetik örneğin dökümü hazır." : "Döküm hazır.");
         }
         catch (Exception ex) { End("Döküm oluşturulamadı. " + ex.Message); }

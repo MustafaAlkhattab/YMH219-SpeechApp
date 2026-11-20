@@ -23,24 +23,15 @@ internal static class SpeechModels
         new("small-tokens.txt", Whisper + "small-tokens.txt", "B34B360DBB493E781E479794586D661700670D65564001F23024971D1F2FA126"),
         new("silero_vad.onnx", Releases + "asr-models/silero_vad.onnx", "9E2449E1087496D8D4CABA907F23E0BD3F78D91FA552479BB9C23AC09CBB1FD6")
     ];
-    private static readonly string[] VoiceHashes =
-    [
-        "B63BABAEFCDD63202C7079ABA25B72A2013825AD5895E2AEFF03D1AE5A5B3BBF",
-        "9E3FEBFACF0ABF4270172D2958BCEC246032B7E88EFC2720840CC80C93DE334E",
-        "C546AF78B6395B4E7C4CE1ED899438B64426A362F5D4EC5FECD090DED9AD7505"
-    ];
+    private const string VoiceBundle = "sherpa-onnx-supertonic-3-tts-int8-2026-05-11";
+    private static readonly string[] VoiceFiles =
+        ["duration_predictor.int8.onnx", "text_encoder.int8.onnx", "vector_estimator.int8.onnx", "vocoder.int8.onnx", "tts.json", "unicode_indexer.bin", "voice.bin"];
 
     public static string File(string name) => Path.Combine(Root, name);
-    private static string Bundle(Voice voice) => "vits-piper-" + voice.Id;
-    public static string VoiceDirectory(Voice voice) => File(Bundle(voice));
-    public static bool VoiceReady(Voice voice) => IsVoiceDirectoryReady(VoiceDirectory(voice), voice);
+    public static string VoiceFile(string name) => Path.Combine(File(VoiceBundle), name);
+    public static bool SynthesisReady => VoiceFiles.All(name => Present(VoiceFile(name)));
     public static bool RecognitionReady => Recognition.All(item => Present(File(item.File)));
-    public static bool Ready => RecognitionReady && NeuralSpeech.Voices.All(VoiceReady);
-
-    private static bool IsVoiceDirectoryReady(string directory, Voice voice) =>
-        Present(Path.Combine(directory, voice.Id + ".onnx")) &&
-        Present(Path.Combine(directory, "tokens.txt")) &&
-        Present(Path.Combine(directory, "espeak-ng-data", "phondata"));
+    public static bool Ready => RecognitionReady && SynthesisReady;
 
     private static bool Present(string path)
     {
@@ -78,18 +69,17 @@ internal static class SpeechModels
         Directory.CreateDirectory(staging);
         try
         {
-            for (int i = 0; i < NeuralSpeech.Voices.Length; i++)
+            if (!SynthesisReady)
             {
-                Voice voice = NeuralSpeech.Voices[i];
-                if (VoiceReady(voice)) continue;
-                string name = Bundle(voice) + ".tar.bz2";
+                string name = VoiceBundle + ".tar.bz2";
                 string archive = Path.Combine(staging, name);
-                await FetchAsync(new(name, Releases + "tts-models/" + name, VoiceHashes[i]), archive, progress, token).ConfigureAwait(false);
-                progress.Report(new("Ses paketi açılıyor · " + voice.Name, 100));
+                await FetchAsync(new(name, Releases + "tts-models/" + name, "82FA96F91C4EF8ABAAE3A14A3F4153FACF88BED821D1F7331CEC2700F432C427"),
+                    archive, progress, token).ConfigureAwait(false);
+                progress.Report(new("Ses paketi açılıyor · Supertonic 3", 100));
                 await ExtractAsync(archive, staging, token).ConfigureAwait(false);
-                string extracted = Path.Combine(staging, Bundle(voice));
-                if (!IsVoiceDirectoryReady(extracted, voice)) throw new InvalidDataException("Ses paketi eksik.");
-                string destination = VoiceDirectory(voice);
+                string extracted = Path.Combine(staging, VoiceBundle);
+                if (!VoiceFiles.All(file => Present(Path.Combine(extracted, file)))) throw new InvalidDataException("Ses paketi eksik.");
+                string destination = File(VoiceBundle);
                 if (Directory.Exists(destination))
                     Directory.Move(destination, destination + ".previous-" + Guid.NewGuid().ToString("N"));
                 Directory.Move(extracted, destination);

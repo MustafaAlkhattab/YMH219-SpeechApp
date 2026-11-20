@@ -4,7 +4,7 @@ using SherpaOnnx;
 
 namespace SpeechApp;
 
-internal sealed record Voice(string Id, string Name, string Language, string Example)
+internal sealed record Voice(int Speaker, string Name, string Language, string Example)
 {
     public override string ToString() => Name;
 }
@@ -17,35 +17,37 @@ internal sealed class NeuralSpeech : IDisposable
 
     public static readonly Voice[] Voices =
     [
-        new("tr_TR-dfki-medium", "Türkçe · DFKI", "tr", "Merhaba! Bu uygulama Türkçe metinleri doğal bir sesle okur."),
-        new("en_US-lessac-medium", "English · Lessac", "en", "Hello! This studio reads English text aloud with a local neural voice."),
-        new("en_US-ryan-medium", "English · Ryan", "en", "Good afternoon! This is a short test of the English voice.")
+        new(0, "Türkçe · Ses 1", "tr", "Merhaba! Bugün hava çok güzel. Yarın tekrar görüşürüz."),
+        new(6, "Türkçe · Ses 2", "tr", "Günaydın! Bugün Fırat Üniversitesi'nde yeni bir proje deniyoruz."),
+        new(0, "English · Voice 1", "en", "Hello! This studio reads English text aloud with a local neural voice."),
+        new(6, "English · Voice 2", "en", "Good afternoon! This is a short test of the English voice.")
     ];
 
     private OfflineTts? tts;
-    private Voice? activeVoice;
     private OfflineRecognizer? recognizer;
     private string? activeLanguage;
 
     public (float[] Samples, int Rate) Synthesize(string text, Voice voice, float speed, CancellationToken token)
     {
-        if (!SpeechModels.VoiceReady(voice)) throw new InvalidOperationException("Bu sesin modelini önce indirin.");
+        if (!SpeechModels.SynthesisReady) throw new InvalidOperationException("Okuma modelini önce indirin.");
         token.ThrowIfCancellationRequested();
-        if (activeVoice != voice)
+        if (tts is null)
         {
-            var directory = SpeechModels.VoiceDirectory(voice);
             var config = new OfflineTtsConfig { MaxNumSentences = 2, SilenceScale = .25f };
             config.Model.NumThreads = Threads;
-            config.Model.Vits.Model = Path.Combine(directory, voice.Id + ".onnx");
-            config.Model.Vits.Tokens = Path.Combine(directory, "tokens.txt");
-            config.Model.Vits.DataDir = Path.Combine(directory, "espeak-ng-data");
-            var next = new OfflineTts(config);
-            tts?.Dispose();
-            tts = next;
-            activeVoice = voice;
+            config.Model.Supertonic.DurationPredictor = SpeechModels.VoiceFile("duration_predictor.int8.onnx");
+            config.Model.Supertonic.TextEncoder = SpeechModels.VoiceFile("text_encoder.int8.onnx");
+            config.Model.Supertonic.VectorEstimator = SpeechModels.VoiceFile("vector_estimator.int8.onnx");
+            config.Model.Supertonic.Vocoder = SpeechModels.VoiceFile("vocoder.int8.onnx");
+            config.Model.Supertonic.TtsJson = SpeechModels.VoiceFile("tts.json");
+            config.Model.Supertonic.UnicodeIndexer = SpeechModels.VoiceFile("unicode_indexer.bin");
+            config.Model.Supertonic.VoiceStyle = SpeechModels.VoiceFile("voice.bin");
+            tts = new OfflineTts(config);
         }
 
-        var audio = tts!.GenerateWithCallback(text, speed, 0, (_, _) => token.IsCancellationRequested ? 0 : 1);
+        var generation = new OfflineTtsGenerationConfig { Sid = voice.Speaker, Speed = speed, NumSteps = 8, SilenceScale = .26f };
+        generation.Extra["lang"] = voice.Language;
+        var audio = tts.GenerateWithConfig(text, generation, (_, _, _, _) => token.IsCancellationRequested ? 0 : 1);
         try
         {
             token.ThrowIfCancellationRequested();
@@ -91,20 +93,12 @@ internal sealed class NeuralSpeech : IDisposable
             activeLanguage = language;
         }
 
-        var transcript = new List<string>();
-        while (!vad.IsEmpty())
-        {
-            var segment = vad.Front();
-            var start = Math.Max(0, (int)segment.Start - SampleRate / 5);
-            var end = Math.Min(samples.Length, (int)segment.Start + segment.Samples.Length + SampleRate / 5);
-            using var stream = recognizer!.CreateStream();
-            stream.AcceptWaveform(SampleRate, samples[start..end]);
-            recognizer.Decode(stream);
-            var text = stream.Result.Text.Trim();
-            if (text.Length > 0) transcript.Add(text);
-            vad.Pop();
-        }
-        return string.Join(' ', transcript);
+        // Decode the whole short take once. A VAD boundary can land inside a word,
+        // and independent fragments would deprive Whisper of sentence context.
+        using var stream = recognizer!.CreateStream();
+        stream.AcceptWaveform(SampleRate, samples);
+        recognizer.Decode(stream);
+        return stream.Result.Text.Trim();
     }
 
     public static float[] ReadWave(string path)
