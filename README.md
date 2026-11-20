@@ -18,7 +18,7 @@ dotnet run -c Release
 
 ## Metinden sese
 
-İlk sekmede metin yazın ve içeriğin diline uygun sesi seçin. Hem Türkçe hem İngilizce için iki farklı sinir ağı sesi vardır. **Örnek metin** seçili dilde bir deneme cümlesi doldurur. **Sesli oku**, **Duraklat / Devam**, **Durdur** ve **Temizle** işlemleri bulunur. Okuma hızını değiştirebilirsiniz.
+İlk sekmede metin yazın ve içeriğin diline uygun sesi seçin. Hem Türkçe hem İngilizce için iki farklı sinir ağı sesi vardır. **Örnek metin** seçili dilde bir deneme cümlesi doldurur. **Sesli oku**, **Duraklat / Devam**, **Durdur** ve **Temizle** işlemleri bulunur. Okuma hızını değiştirebilir, süre ve ilerleme çubuğundan oynatmayı takip edebilirsiniz.
 
 ## Sesten metne
 
