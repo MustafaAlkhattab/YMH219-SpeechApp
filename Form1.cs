@@ -20,7 +20,7 @@ public partial class Form1 : Form
         InitializeComponent(); Controls.Clear(); AutoScaleMode = AutoScaleMode.None;
         Text = "Fırat Speech | YMH219"; ClientSize = new(1050, 790); MinimumSize = new(950, 700); StartPosition = FormStartPosition.CenterScreen; Font = new("Segoe UI", 10); BackColor = Color.FromArgb(239, 246, 255);
         var root = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new(24), ColumnCount = 1, RowCount = 8 };
-        root.RowStyles.Add(new(SizeType.Absolute, 58)); root.RowStyles.Add(new(SizeType.Absolute, 55)); root.RowStyles.Add(new(SizeType.Absolute, 85)); root.RowStyles.Add(new(SizeType.Percent, 50)); root.RowStyles.Add(new(SizeType.Absolute, 85)); root.RowStyles.Add(new(SizeType.Percent, 50)); root.RowStyles.Add(new(SizeType.Absolute, 45)); root.RowStyles.Add(new(SizeType.Absolute, 30));
+        root.RowStyles.Add(new(SizeType.Absolute, 58)); root.RowStyles.Add(new(SizeType.Absolute, 55)); root.RowStyles.Add(new(SizeType.Absolute, 105)); root.RowStyles.Add(new(SizeType.Percent, 50)); root.RowStyles.Add(new(SizeType.Absolute, 105)); root.RowStyles.Add(new(SizeType.Percent, 50)); root.RowStyles.Add(new(SizeType.Absolute, 45)); root.RowStyles.Add(new(SizeType.Absolute, 30));
         root.Controls.Add(new Label { Text = "FIRAT SPEECH", AutoSize = true, Font = new("Segoe UI", 24, FontStyle.Bold), ForeColor = Color.FromArgb(30, 64, 175) }, 0, 0);
         root.Controls.Add(new Label { Text = "Metni seslendir veya mikrofon konuşmasını metne dönüştür.\nKonuşurken seçili tanıma motorunun dilini kullanın.", AutoSize = true }, 0, 1);
         var ttsTools = new FlowLayoutPanel { Dock = DockStyle.Fill };
@@ -66,3 +66,4 @@ public partial class Form1 : Form
     private void Ui(Action action) { if (closing || IsDisposed || !IsHandleCreated) return; try { BeginInvoke(action); } catch (InvalidOperationException) { } }
     protected override void OnFormClosing(FormClosingEventArgs e) { closing = true; speech?.Dispose(); base.OnFormClosing(e); }
 }
+
